@@ -1,6 +1,6 @@
 # Agent 工作约定
 
-本项目提供通用 Wiki 模板，并通过 `wiki-init` 帮助用户完成初始化。项目介绍见 [README](README.md)，Wiki 定位、范围和当前画像见 [SELF](wiki/SELF.md)。
+本项目提供通用 LLM Wiki 模板，并通过 `wiki-init` 帮助用户完成初始化。项目介绍见 [README](README.md)，Wiki 定位、范围和当前画像见 [SELF](wiki/SELF.md)。
 
 ## 任务入口
 

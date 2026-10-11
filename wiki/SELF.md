@@ -4,7 +4,7 @@
 
 ## 定位与用途
 
-当前为通用 Wiki 模板，具体主题、服务对象和用途尚未确定。初始化时，使用 [wiki-init](../.agents/skills/wiki-init/SKILL.md) 根据用户需求明确这些内容。
+当前为通用 LLM Wiki 模板，由用户确定目标与来源，LLM Agent 协助整理和维护知识页面。具体主题、服务对象和用途尚未确定。初始化时，使用 [wiki-init](../.agents/skills/wiki-init/SKILL.md) 根据用户需求明确这些内容。
 
 ## 内容范围与组织
 
