@@ -52,13 +52,33 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 │   └── INDEX.md               知识导航
 └── .agents/
     └── skills/
-        └── wiki-init/
-            └── SKILL.md       初始化方法
+        ├── skill-creator/
+        │   ├── README.md      Skill 设计与维护规范
+        │   └── SKILL.md       Skill 创建与修改方法
+        ├── wiki-init/
+        │   ├── README.md      初始化设计
+        │   └── SKILL.md       初始化执行规范
+        ├── wiki-ingest/
+        │   └── README.md      预留设计入口
+        ├── wiki-query/
+        │   └── README.md      预留设计入口
+        └── wiki-review/
+            └── README.md      预留设计入口
 ```
 
 模板使用本地 Markdown 文件保存内容，以相对链接建立导航，通过 Git 提交记录版本。`raw/` 保存来源，`wiki/` 组织知识；具体分类根据用户需求和实际内容建立。
 
-本项目提供的 Skill 是 [wiki-init](.agents/skills/wiki-init/SKILL.md)。初始化后的资料入库、查询与维护，可以让 Agent 按 Wiki 的工作约定执行。
+项目中的 Skill 按以下状态维护：
+
+| Skill | 用途 | 当前状态与入口 |
+| --- | --- | --- |
+| `skill-creator` | 创建与修改 Skill。 | 已迁入；[设计规范](.agents/skills/skill-creator/README.md)、[执行规范](.agents/skills/skill-creator/SKILL.md)。 |
+| `wiki-init` | 定制用户自己的 Wiki。 | [设计](.agents/skills/wiki-init/README.md)与[执行规范](.agents/skills/wiki-init/SKILL.md)已同步。 |
+| `wiki-ingest` | 将来源中的知识增量整合到 Wiki。 | [预留设计入口](.agents/skills/wiki-ingest/README.md)，尚未实现。 |
+| `wiki-query` | 查找知识并开展查询。 | [预留设计入口](.agents/skills/wiki-query/README.md)，尚未实现。 |
+| `wiki-review` | 审核知识、证据与组织质量。 | [预留设计入口](.agents/skills/wiki-review/README.md)，尚未实现。 |
+
+创建或修改 Skill 时使用本项目的 `skill-creator`：README 保存设计，SKILL.md 保存执行规范。预留入口用于后续讨论，完成设计与实现后再作为可调用 Skill 使用。初始化后的资料入库、查询与维护，也可以让 Agent 按 Wiki 的工作约定执行。
 
 ### 如何初始化
 
