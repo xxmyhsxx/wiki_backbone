@@ -5,10 +5,12 @@
 ## 任务入口
 
 - 用户要求初始化 Wiki 时，读取并使用 [wiki-init](.agents/skills/wiki-init/SKILL.md)。
+- 用户要求入库或用新来源补充 Wiki 时，使用 [wiki-ingest](.agents/skills/wiki-ingest/SKILL.md)；定位、解释、比较与分析使用 [wiki-query](.agents/skills/wiki-query/SKILL.md)。
+- 评估事实、证据、解释深度与知识缺口时，使用 [wiki-review](.agents/skills/wiki-review/SKILL.md)；文件、链接、锚点与导航机械检查使用 [wiki-lint](.agents/skills/wiki-lint/SKILL.md)。
 - 创建或修改本项目的 Skill 时，读取并使用本项目 [skill-creator](.agents/skills/skill-creator/SKILL.md)。Skill 的 README 保存设计，SKILL.md 保存执行规范，按该 Skill 的流程完成设计确认、实现和校验。
 - 开展 Wiki 工作前，结合 `wiki/SELF.md` 明确用途、范围和当前状态；根据任务阅读相关页面及 [来源资料规则](raw/README.md)、[知识页面规范](wiki/README.md)。
 - 具体任务优先复用已有内容和已确定的约定，按实际需求选择项目中的 Skill。
-- `wiki-ingest`、`wiki-query`、`wiki-review` 当前只有预留设计入口，尚无执行规范；当前可用与待完善状态见 [README 的 Skill 说明](README.md#模板提供什么)。
+- 当前 Skill 的设计、执行规范与工具入口见 [README 的 Skill 说明](README.md#模板提供什么)。
 
 ## 资料与知识
 
