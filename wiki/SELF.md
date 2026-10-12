@@ -8,13 +8,13 @@
 
 ## 内容范围与组织
 
-具体知识范围和分类尚未确定。`raw/` 保存来源资料，`wiki/` 组织经过理解的知识，目录按实际内容建立。
+具体知识范围和分类尚未确定。初始化时先讨论用途、边界和来源类型，再确定保存形式，由 AI 检索并推荐 Wiki 目录、页面及其关系。`raw/` 按入库日期保存原件、转录文章和说明；`wiki/` 按确认的方案组织知识，有实际内容时再建立目录和页面。
 
 来源保存规则见 [raw 说明](../raw/README.md)，知识页面规则见 [Wiki 规范](README.md)。
 
 ## 当前画像
 
-当前已有模板说明、组织规范、导航和六个 Skill：`skill-creator`、`wiki-init`、`wiki-ingest`、`wiki-query`、`wiki-review`、`wiki-lint`，各自包含设计与执行规范。lint 提供只读 Python 检查工具和行为测试。入口见 [Skill 说明](../README.md#模板提供什么)。
+当前已有模板说明、组织规范、导航和六个 Skill：`skill-creator`、`wiki-init`、`wiki-ingest`、`wiki-query`、`wiki-review`、`wiki-lint`，各自包含设计与执行规范。lint 结合 raw 基础查看、只读 Python 结构工具和 review 内容核验；Wiki 检查覆盖内容、引用、导航、组织、一致性与当前状态及知识缺口。结构工具附有行为测试，脚本结果只代表机械检查。入口见 [Skill 说明](../README.md#模板提供什么)。
 
 当前尚无用户资料或知识页面。现有目录表示文件职责，不表示对应知识已经建设完成；Skill 和工具已建立，也不表示真实用户的入库、查询或内容审核已经完成。
 

@@ -23,14 +23,14 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 - **知识页面**保存经过理解和组织的内容，以及页面之间的联系。
 - **工作约定**说明内容如何组织、来源如何引用，以及任务如何完成。
 
-常用操作包括以下几类。原始说明中的 Lint 包含内容与组织检查；本模板通过 Review 和 Lint 分别完成内容核验与机械检查。[参考原始说明](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+常用操作包括以下几类。Lint 组织一次 Wiki 检查：用工具核对结构，查看 raw 基础情况，并复用 Review 核验知识内容；Review 也可单独用于指定内容的深入审核。[参考原始说明](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 
 | 操作 | 何时使用 | 工作结果 |
 | --- | --- | --- |
 | **Ingest：资料入库** | 有新来源需要整理时。 | 创建或修订知识页面，同步来源引用、页面链接和导航。 |
 | **Query：查询与探索** | 需要定位、解释、比较或分析问题时。 | 利用实际页面及来源回答问题；用户要求保存时写回有价值的分析。 |
 | **Review：内容审核** | 评估知识、证据与解释质量时。 | 回查关键主张，检查解释断点、条件差异、矛盾与重要知识缺口，提出有依据的建议。 |
-| **Lint：机械检查** | 检查文件、链接与导航时。 | 用只读工具发现管理文件缺失、断链、失效锚点和无法从 INDEX 到达的知识页。 |
+| **Lint：Wiki 检查** | 检查整个 Wiki 或本次改动时。 | raw 做基础检查；工具核对结构，AI 检查 Wiki 内容、引用、导航、组织、一致性与当前状态。 |
 
 入库增加和更新知识，查询推动进一步探索，维护帮助页面保持可用。这些名称表示 Agent 的任务类型，具体流程可以按 Wiki 的用途确定。用户负责选择来源、判断重点和复核重要结论，Agent 按约定整理与维护。
 
@@ -69,7 +69,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
         │   ├── README.md      内容审核设计
         │   └── SKILL.md       审核与修复执行规范
         └── wiki-lint/
-            ├── README.md     机械检查设计
+            ├── README.md     Wiki 检查设计
             ├── SKILL.md      检查与修复执行规范
             ├── scripts/
             │   └── check_wiki.py
@@ -88,7 +88,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | `wiki-ingest` | 将来源中的知识增量整合到 Wiki。 | [设计](.agents/skills/wiki-ingest/README.md)、[执行规范](.agents/skills/wiki-ingest/SKILL.md)。 |
 | `wiki-query` | 定位、解释、比较与分析，按要求写回。 | [设计](.agents/skills/wiki-query/README.md)、[执行规范](.agents/skills/wiki-query/SKILL.md)。 |
 | `wiki-review` | 审核证据、解释深度、关联与知识缺口。 | [设计](.agents/skills/wiki-review/README.md)、[执行规范](.agents/skills/wiki-review/SKILL.md)。 |
-| `wiki-lint` | 检查文件、链接、锚点与导航可达性。 | [设计](.agents/skills/wiki-lint/README.md)、[执行规范](.agents/skills/wiki-lint/SKILL.md)、[检查工具](.agents/skills/wiki-lint/scripts/check_wiki.py)。 |
+| `wiki-lint` | 组织 raw 基础检查、工具结构检查与 Wiki 内容核验。 | [设计](.agents/skills/wiki-lint/README.md)、[执行规范](.agents/skills/wiki-lint/SKILL.md)、[结构工具](.agents/skills/wiki-lint/scripts/check_wiki.py)。 |
 
 创建或修改 Skill 时使用本项目的 `skill-creator`：README 保存设计，SKILL.md 保存执行规范。每个 Wiki Skill 都有完成条件，评估用途、证据、实际产物及核验边界；具体指标见相应文件。
 
@@ -114,7 +114,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 
    如需初始化到其他目录，同时提供目标位置。
 
-3. **确定方案并完成初始化。** 与 Agent 明确用途、范围和组织方式。Agent 根据方案定制说明与工作约定，填写 `wiki/SELF.md`，调整必要目录和导航，并检查链接与描述是否一致。
+3. **逐项确定方案并完成初始化。** 先与 Agent 确定用途和内容边界，再确认可能的资料来源及原件、转录的保存形式。raw 按入库日期保存，每条包含原件、转录文章和说明。Agent 检索相关材料，推荐 Wiki 目录、候选页面及其关系，再根据已确认的 raw、Wiki 规范推荐检查项。方案确定后定制说明与工作约定，填写 `wiki/SELF.md`，将实际页面加入导航并完成核对。
 
 没有初始资料时，也可以先完成结构与约定的初始化；SELF 如实记录当前内容和下一步。完成后，查看 README、SELF 和 INDEX，确认用途、组织方式和使用入口符合你的需求。
 
@@ -135,18 +135,21 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | 资料入库 | 使用 wiki-ingest 读取这份资料，检查已有覆盖，再将有依据的增量写入 Wiki。 |
 | 查询与探索 | 使用 wiki-query 比较这两种方法，引用已有页面，说明可比条件和证据缺口。 |
 | 内容审核 | 使用 wiki-review 审核这些页面的关键主张、解释深度和关联，给出依据及修改建议。 |
-| 机械检查 | 使用 wiki-lint 检查当前 Wiki 的文件、链接、锚点和导航。 |
+| Wiki 检查 | 使用 wiki-lint 检查当前 Wiki：raw 做基础检查，Wiki 按已确认的六类要求核对。 |
+| 仅机械检查 | 使用 wiki-lint 只检查文件、链接、锚点和导航。 |
 
 只要求查询或审核时，Agent 交付结果与建议；要求保存或修复时，按明确范围完成改动和复查。
 
-lint 工具依赖 Python 3.9+ 标准库，可从项目根目录直接运行：
+lint 中的结构工具依赖 Python 3.9+ 标准库，可从项目根目录直接运行：
 
 ```bash
 python3 .agents/skills/wiki-lint/scripts/check_wiki.py --root .
 python3 .agents/skills/wiki-lint/scripts/check_wiki.py --root . --paths wiki/SELF.md wiki/INDEX.md
 ```
 
-检查输出 JSON，列出实际范围、错误、提醒和跳过项；加 `--strict` 可让提醒也返回失败。局部检查跳过全库导航可达性。在 raw/ 中默认只检查 raw/README.md，原始资料正文在明确指定时检查，避免误判原文中的相对链接。支持范围见 [wiki-lint 设计](.agents/skills/wiki-lint/README.md#51-工具检查范围)。机械检查通过后，事实、引用支持与知识解释仍需依据来源核验。
+结构工具输出 JSON，列出实际范围、错误、提醒和跳过项；加 `--strict` 可让提醒也返回失败。局部运行跳过全库导航可达性；脚本在 raw/ 中默认只扫描 raw/README.md，来源正文在明确指定时扫描，避免误判原文中的相对链接。支持范围见 [wiki-lint 设计](.agents/skills/wiki-lint/README.md#51-工具检查范围)。
+
+完整的 lint 还由 Agent 查看 raw 的保存位置、三部分是否齐全且可读、来源是否清楚，并复用 review 核对 [Wiki 的六类检查项](wiki/README.md#检查约定)。这些结果不包含在脚本 JSON 或退出码中；报告分别说明工具与 AI 的实际覆盖、确定问题、待核疑点和建议。raw 日常不做逐段转录校对。
 
 ### 设计参考
 
