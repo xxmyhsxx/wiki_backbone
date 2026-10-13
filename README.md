@@ -79,6 +79,8 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 
 模板使用本地 Markdown 文件保存内容，以相对链接建立导航，通过 Git 提交记录版本。`raw/` 保存来源，`wiki/` 组织知识；具体分类根据用户需求和实际内容建立。
 
+想先看实际产物，可以阅读 [完整示例](examples/llm-wiki-demo/README.md)：两份固定版本来源如何形成知识页面，新资料补充了什么，以及重复入库、查询与审核怎样验证。示例位于独立目录，供理解和参考；自己的 Wiki 仍按用途初始化。
+
 项目中的 Skill 按以下状态维护：
 
 | Skill | 用途 | 当前状态与入口 |
@@ -158,3 +160,5 @@ python3 .agents/skills/wiki-lint/scripts/check_wiki.py --root . --paths wiki/SEL
 - [godstale/LLM-WiKi](https://github.com/godstale/LLM-WiKi)：将结构检查工具与 Agent 内容检查配合使用的实现参考。
 
 本模板结合这些思路和自身约定设计流程：raw 保留来源，wiki 组织可独立阅读的知识，通过标准 Markdown 链接与 INDEX 建立阅读路径，用 Git 记录修改。具体分类、来源格式和解释深度在初始化时确定。
+
+完整示例与入库边界修订的实施安排、验收方法和后续工具取舍见 [模板改进方案](docs/template-improvement-plan.md)，实际结果见 [示例验收](examples/llm-wiki-demo/README.md#实际验收结果)。
