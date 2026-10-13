@@ -4,8 +4,9 @@
 
 ## 任务入口
 
-- 用户要求初始化 Wiki 时，读取并使用 [wiki-init](.agents/skills/wiki-init/SKILL.md)。先讨论用途与边界、来源类型和保存形式，再由 AI 检索并推荐目录、页面及检查项；用户确认后落实约定，定制查询 Skill 并安装同名镜像。
-- 用户要求入库或用新来源补充 Wiki 时，使用 [wiki-ingest](.agents/skills/wiki-ingest/SKILL.md)。定位、解释、比较与分析使用 [wiki-query](.agents/skills/wiki-query/SKILL.md)；具体 Wiki 使用初始化定制的 `query-<wiki-id>`。查询只读取指定 Wiki 的 `wiki/`，不读取 raw，唯一写入是向 `query-feedback/` 新增独立反馈文件。
+- 用户要求初始化 Wiki 时，读取并使用 [wiki-init](.agents/skills/wiki-init/SKILL.md)。先讨论用途与边界、来源类型和保存形式，再确定目录、页面、检查项及适用的对外能力；用户确认后定制知识入口或完整能力包，按确认位置安装同名镜像。
+- 用户要求入库或用新来源补充 Wiki 时，使用 [wiki-ingest](.agents/skills/wiki-ingest/SKILL.md)。定位、解释、比较与分析使用 [wiki-query](.agents/skills/wiki-query/SKILL.md)。独立查询只读取指定 Wiki 的 `wiki/`，不读取 raw，只新增一份 query-feedback；作为包内能力调用时交付反馈信息，由包入口统一回传。
+- 完整对外使用、发布、安装或更新使用 [wiki-use](.agents/skills/wiki-use/SKILL.md)。init 按用途定制为 `use-<wiki-id>`，默认选择已有 query，其他能力按实际需求确认；维护 Skill 不默认下发。知识留在原 Wiki，应用文件和任务快照归使用方，对 Wiki 仅新增反馈。现有轻量 `query-<wiki-id>` 继续按原约定使用。
 - 评估指定内容的事实、证据、解释深度与知识缺口时，使用 [wiki-review](.agents/skills/wiki-review/SKILL.md)。综合检查使用 [wiki-lint](.agents/skills/wiki-lint/SKILL.md)：raw 做基础检查，工具核对结构，AI 复用 review 核验 Wiki 的六类内容要求；仅要求机械检查时限定在对应范围。
 - 创建或修改本项目的 Skill 时，读取并使用本项目 [skill-creator](.agents/skills/skill-creator/SKILL.md)。Skill 的 README 保存设计，SKILL.md 保存执行规范，按该 Skill 的流程完成设计确认、实现和校验。
 - 开展 Wiki 工作前，结合 `wiki/SELF.md` 明确用途、范围和当前状态。查询从 SELF、INDEX 和知识正文定位内容；入库或维护按任务阅读 [来源资料规则](raw/README.md)、[知识页面规范](wiki/README.md) 及相关材料。
@@ -22,7 +23,7 @@
 
 - 写入前阅读目标文件和相关内容，确认本次文件职责与写入范围，保留用户已有资料、知识和有效约定。
 - 初始化完成后，项目 README、AGENTS、raw 与 wiki 的规范 README，以及 Skill 的 README、SKILL 沿用已确认版本。“固定”约束 AI 在日常任务中的修改权限，防止擅自改写；用户明确授权调整对应说明或规范时，维护端可在指定范围内迭代，检查后交付或发布新版本。知识变化和工具升级不构成修改授权。
-- 定制的查询 Skill 以同名、同内容的完整镜像交付。镜像由已授权的更新任务按已确认约定同步，保留使用方定制；日常 query 不改写、安装或同步 Skill，任务开始后沿用已选规范版本。知识页面和导航更新后，查询直接读取当前内容，不因此升级 Skill。
+- 对外入口以同名、同内容的完整镜像交付。镜像由已授权的更新任务按已确认约定同步，保留使用方定制；包工具核对来源、版本和实际接收位置，更新保留旧包备份并报告，不自动删除。日常 query 不改写、安装或同步 Skill；完整包任务使用固定快照，知识变化不触发包升级。
 - 每次执行入库或其他实际修改后，在根目录 [LOG.md](LOG.md) 按日期追加一条简短记录：做了什么、实际结果，必要时补充原因或未完成事项。重复入库没有知识增量时也记录处理结论；同一任务中的检查合并说明，不改旧记录，具体差异由 Git 保存。LOG 可日常追加，纯讨论、拟稿或只读检查不记，外部 query 仍只写 query-feedback。
 - 查询反馈只新增唯一命名的日志，不追加、覆盖或修改已有日志，也不修改正文、INDEX、SELF 或规范。Wiki 端另行审核反馈并按授权处理，日志不自动触发修复或 Skill 调整；无法回传时交付日志并说明未写入。
 - 日常按既定规则处理来源条目、知识正文和附件。来源条目中的 README 用于记录出处，可随条目创建或按来源版本规则维护，不属于初始化规范。

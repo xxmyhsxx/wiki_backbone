@@ -14,7 +14,7 @@
 
 ## 当前画像
 
-当前已有模板说明、组织规范、导航和六个 Skill：`skill-creator`、`wiki-init`、`wiki-ingest`、`wiki-query`、`wiki-review`、`wiki-lint`，各自包含设计与执行规范。lint 结合 raw 基础查看、只读 Python 结构工具和 review 内容核验；Wiki 检查覆盖内容、引用、导航、组织、一致性与当前状态及知识缺口。结构工具附有行为测试，脚本结果只代表机械检查。入口见 [Skill 说明](../README.md#模板提供什么)。
+当前已有模板说明、组织规范、导航和七个 Skill：`skill-creator`、`wiki-init`、`wiki-ingest`、`wiki-query`、`wiki-use`、`wiki-review`、`wiki-lint`，各自包含设计与执行规范。wiki-use 提供通用完整包入口及发布、安装、更新、快照和反馈工具，由 init 按用途选择能力并定制绑定；模板未绑定具体 Wiki，也没有预填已发布包清单。lint 结合 raw 基础查看、只读 Python 结构工具和 review 内容核验；结构与包工具均附有行为测试，实际验证范围按交付说明。入口见 [Skill 说明](../README.md#模板提供什么)。
 
 根目录的 raw 与 wiki 当前尚无用户资料或正式知识页面。现有目录表示文件职责，不表示对应知识已经建设完成；Skill 和工具已建立，也不表示所有真实用户任务已经验证。
 

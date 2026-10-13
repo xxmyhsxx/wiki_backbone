@@ -66,6 +66,10 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
         ├── wiki-query/
         │   ├── README.md      查询导航与反馈设计
         │   └── SKILL.md       查询导航与反馈执行规范
+        ├── wiki-use/
+        │   ├── README.md      对外能力包设计
+        │   ├── SKILL.md       通用包入口模板
+        │   └── scripts/       发布、安装、更新与反馈工具及测试
         ├── wiki-review/
         │   ├── README.md      内容审核设计
         │   └── SKILL.md       审核与修复执行规范
@@ -89,7 +93,8 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | `skill-creator` | 创建与修改 Skill。 | 已迁入；[设计规范](.agents/skills/skill-creator/README.md)、[执行规范](.agents/skills/skill-creator/SKILL.md)。 |
 | `wiki-init` | 定制用户自己的 Wiki。 | [设计](.agents/skills/wiki-init/README.md)与[执行规范](.agents/skills/wiki-init/SKILL.md)已同步。 |
 | `wiki-ingest` | 将来源中的知识增量整合到 Wiki。 | [设计](.agents/skills/wiki-ingest/README.md)、[执行规范](.agents/skills/wiki-ingest/SKILL.md)。 |
-| `wiki-query` | 为 Wiki 内外的模型提供知识导航与查询，回传独立反馈。 | [设计](.agents/skills/wiki-query/README.md)、[执行规范](.agents/skills/wiki-query/SKILL.md)；初始化定制为 `query-<wiki-id>` 并安装同名镜像。 |
+| `wiki-query` | 提供知识导航与查询反馈。 | [设计](.agents/skills/wiki-query/README.md)、[执行规范](.agents/skills/wiki-query/SKILL.md)；独立模式定制为 `query-<wiki-id>`，完整模式由 `use-<wiki-id>` 调用包内 query。 |
+| `wiki-use` | 按用途发布完整对外能力包，接入使用方并汇总反馈。 | [设计](.agents/skills/wiki-use/README.md)、[入口模板](.agents/skills/wiki-use/SKILL.md)、[包工具](.agents/skills/wiki-use/scripts/package.py)；由 init 定制绑定和内部能力后发布。 |
 | `wiki-review` | 审核证据、解释深度、关联与知识缺口。 | [设计](.agents/skills/wiki-review/README.md)、[执行规范](.agents/skills/wiki-review/SKILL.md)。 |
 | `wiki-lint` | 组织 raw 基础检查、工具结构检查与 Wiki 内容核验。 | [设计](.agents/skills/wiki-lint/README.md)、[执行规范](.agents/skills/wiki-lint/SKILL.md)、[结构工具](.agents/skills/wiki-lint/scripts/check_wiki.py)。 |
 
@@ -119,7 +124,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 
 3. **逐项确定方案并完成初始化。** 先与 Agent 确定用途和内容边界，再确认可能的资料来源及原件、转录的保存形式。raw 按入库日期保存，每条包含原件、转录文章和说明。Agent 检索相关材料，推荐 Wiki 目录、候选页面及其关系，再根据已确认的 raw、Wiki 规范推荐检查项。方案确定后定制说明与工作约定，填写 `wiki/SELF.md`，将实际页面加入导航并核对。
 
-   同时确定查询 Skill 名称、Wiki 的绝对位置和镜像安装目录，生成自包含的 `query-<wiki-id>`，创建 `query-feedback/` 并安装同名、同内容的镜像。最后从 Wiki 外的工作目录验证查询与反馈回传。
+   同时按用途确定适用的对外能力、入口名称、Wiki 绝对位置和接收位置。完整模式由 wiki-use 模板生成 `use-<wiki-id>`，默认包含 query，按需加入已经实现的其他能力；发布完整清单后安装同名镜像，并从 Wiki 外验证使用和反馈。只需轻量独立查询时仍可生成 `query-<wiki-id>`。
 
 没有初始资料时，也可以先完成结构与约定的初始化；SELF 如实记录当前内容和下一步。完成后，查看 README、SELF 和 INDEX，确认用途、组织方式和使用入口符合你的需求。
 
@@ -150,20 +155,24 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 
 ### 在其他项目中使用 Wiki
 
-初始化会将查询 Skill 定制为 `query-quant-wiki` 这样的名称：Wiki 内保存本体，确认的共享 Skill 目录保存同名、同内容的镜像。Skill 绑定 Wiki 的绝对位置，外部项目沿 SELF、INDEX、定向搜索及知识页链接查询，无需把项目放进 Wiki 仓库。安装位置根据模型运行环境确定；Codex 的用户级共享目录见[官方 Skill 文档](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)。模板本身保留通用 `wiki-query`，不为尚未初始化的主题安装镜像。
+完整模式使用初始化定制的 `use-<wiki-id>`。Wiki 内保存能力包本体，使用方接收完整镜像；一个入口根据任务选择包内的知识查询或其他已确认能力。知识正文留在原 Wiki，应用代码、运行结果与任务快照保存在使用方项目，不需要把项目放进 Wiki。
 
-例如，在使用方项目中请求：
+对外能力按 Wiki 用途选择，默认包含本模板的 query，不默认携带入库、审核、检查或规范维护能力。模板提供通用入口和工具，具体 Wiki 的名称、绑定、能力清单及发布版本由 init 落实；未定制的模板不算已发布包。
+
+例如，向 Agent 请求接入和使用：
 
 ```text
-使用 query-quant-wiki 查找与当前问题有关的知识，读取正文后说明依据和适用条件。
-只查询 wiki/，不读取 raw；向 query-feedback/ 新增本次反馈，不修改其他 Wiki 文件。
+将这个 Wiki 的完整能力包安装到我指定的项目目录，核对接入结果。
+使用 use-my-wiki 查找与当前问题有关的知识，说明依据和适用条件，并回传反馈。
 ```
 
-反馈记录查询时间与 Wiki 标识、问题摘要、检索词、实际读取的页面和章节、查询结果、限制及具体建议。每次使用唯一文件名，不追加或覆盖已有日志；无法回传时输出日志并说明未写入。Wiki 维护端之后审核反馈，日志本身不授权修订内容。
+接收位置可以是已确认的项目或共享 Skill 目录，工具分别使用 `install --project` 和 `install --skills-dir`。提供仓库 URL 时先确定实际接收工作区；实际安装只在目标明确且已授权时执行。Codex 用户级共享目录见[官方 Skill 文档](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)。
 
-初始化后，介绍、规范及查询 Skill 沿用已确认版本。“固定”用于防止 AI 在日常任务中擅自改写；维护端可按用户明确授权迭代，检查后交付或发布新版本。镜像由已授权的更新任务按已确认约定同步完整版本，保留使用方定制；单次任务开始后沿用已选规范版本。
+每次应用调用由入口汇总一份使用反馈，向原 Wiki 的 `query-feedback/` 唯一新建日志；内部能力不重复写，纯安装不制造知识反馈。query 仍只读知识、不读 raw。无法回传时交付文本和具体限制，反馈不自动修订公共知识或规范。
 
-知识与导航更新不触发 Skill 迭代，query 每次读取当前知识，本身不改写、安装或同步 Skill。外部环境无法访问绑定位置时报告具体限制；同名异内容只有在已授权更新、且确认原镜像未被使用方修改时才同步，否则保留已有文件并报告差异。
+“固定”限制日常擅自修改，维护端仍可按授权迭代并检查发布。使用方按已确认约定更新完整包，项目定制和不同来源保留；旧包备份保留并报告，不自动清理。单次任务使用完整版本快照，知识正文仍动态读取，不因知识更新升级能力包。
+
+现有轻量 `query-<wiki-id>` 入口继续可用，沿 SELF、INDEX、定向搜索和正文链接查询，由独立 query 自己回传一份日志。具体流程见 [wiki-query](.agents/skills/wiki-query/SKILL.md)；完整包流程与工具验收见 [wiki-use](.agents/skills/wiki-use/README.md)。
 
 lint 中的结构工具依赖 Python 3.9+ 标准库，可从项目根目录直接运行：
 
