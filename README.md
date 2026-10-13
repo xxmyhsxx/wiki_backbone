@@ -28,7 +28,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | 操作 | 何时使用 | 工作结果 |
 | --- | --- | --- |
 | **Ingest：资料入库** | 有新来源需要整理时。 | 创建或修订知识页面，同步来源引用、页面链接和导航。 |
-| **Query：查询与探索** | 需要定位、解释、比较或分析问题时。 | 利用实际页面及来源回答问题；用户要求保存时写回有价值的分析。 |
+| **Query：查询与探索** | Wiki 内外的项目需要定位、解释、比较或分析知识时。 | 只读知识页面给出带依据的结果，新增独立查询反馈日志。 |
 | **Review：内容审核** | 评估知识、证据与解释质量时。 | 回查关键主张，检查解释断点、条件差异、矛盾与重要知识缺口，提出有依据的建议。 |
 | **Lint：Wiki 检查** | 检查整个 Wiki 或本次改动时。 | raw 做基础检查；工具核对结构，AI 检查 Wiki 内容、引用、导航、组织、一致性与当前状态。 |
 
@@ -63,8 +63,8 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
         │   ├── README.md      资料入库设计
         │   └── SKILL.md       资料入库执行规范
         ├── wiki-query/
-        │   ├── README.md      查询与探索设计
-        │   └── SKILL.md       查询与写回执行规范
+        │   ├── README.md      查询导航与反馈设计
+        │   └── SKILL.md       查询导航与反馈执行规范
         ├── wiki-review/
         │   ├── README.md      内容审核设计
         │   └── SKILL.md       审核与修复执行规范
@@ -88,7 +88,7 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | `skill-creator` | 创建与修改 Skill。 | 已迁入；[设计规范](.agents/skills/skill-creator/README.md)、[执行规范](.agents/skills/skill-creator/SKILL.md)。 |
 | `wiki-init` | 定制用户自己的 Wiki。 | [设计](.agents/skills/wiki-init/README.md)与[执行规范](.agents/skills/wiki-init/SKILL.md)已同步。 |
 | `wiki-ingest` | 将来源中的知识增量整合到 Wiki。 | [设计](.agents/skills/wiki-ingest/README.md)、[执行规范](.agents/skills/wiki-ingest/SKILL.md)。 |
-| `wiki-query` | 定位、解释、比较与分析，按要求写回。 | [设计](.agents/skills/wiki-query/README.md)、[执行规范](.agents/skills/wiki-query/SKILL.md)。 |
+| `wiki-query` | 为 Wiki 内外的模型提供知识导航与查询，回传独立反馈。 | [设计](.agents/skills/wiki-query/README.md)、[执行规范](.agents/skills/wiki-query/SKILL.md)；初始化定制为 `query-<wiki-id>` 并安装同名镜像。 |
 | `wiki-review` | 审核证据、解释深度、关联与知识缺口。 | [设计](.agents/skills/wiki-review/README.md)、[执行规范](.agents/skills/wiki-review/SKILL.md)。 |
 | `wiki-lint` | 组织 raw 基础检查、工具结构检查与 Wiki 内容核验。 | [设计](.agents/skills/wiki-lint/README.md)、[执行规范](.agents/skills/wiki-lint/SKILL.md)、[结构工具](.agents/skills/wiki-lint/scripts/check_wiki.py)。 |
 
@@ -116,7 +116,9 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 
    如需初始化到其他目录，同时提供目标位置。
 
-3. **逐项确定方案并完成初始化。** 先与 Agent 确定用途和内容边界，再确认可能的资料来源及原件、转录的保存形式。raw 按入库日期保存，每条包含原件、转录文章和说明。Agent 检索相关材料，推荐 Wiki 目录、候选页面及其关系，再根据已确认的 raw、Wiki 规范推荐检查项。方案确定后定制说明与工作约定，填写 `wiki/SELF.md`，将实际页面加入导航并完成核对。
+3. **逐项确定方案并完成初始化。** 先与 Agent 确定用途和内容边界，再确认可能的资料来源及原件、转录的保存形式。raw 按入库日期保存，每条包含原件、转录文章和说明。Agent 检索相关材料，推荐 Wiki 目录、候选页面及其关系，再根据已确认的 raw、Wiki 规范推荐检查项。方案确定后定制说明与工作约定，填写 `wiki/SELF.md`，将实际页面加入导航并核对。
+
+   同时确定查询 Skill 名称、Wiki 的绝对位置和镜像安装目录，生成自包含的 `query-<wiki-id>`，创建 `query-feedback/` 并安装同名、同内容的镜像。最后从 Wiki 外的工作目录验证查询与反馈回传。
 
 没有初始资料时，也可以先完成结构与约定的初始化；SELF 如实记录当前内容和下一步。完成后，查看 README、SELF 和 INDEX，确认用途、组织方式和使用入口符合你的需求。
 
@@ -135,12 +137,27 @@ LLM Wiki 是一种用大语言模型（LLM）持续构建和维护知识库的�
 | 任务 | 请求示例 |
 | --- | --- |
 | 资料入库 | 使用 wiki-ingest 读取这份资料，检查已有覆盖，再将有依据的增量写入 Wiki。 |
-| 查询与探索 | 使用 wiki-query 比较这两种方法，引用已有页面，说明可比条件和证据缺口。 |
+| 查询与探索 | 使用初始化定制的 query Skill 比较这两种方法，引用 Wiki 页面，说明可比条件与知识缺口，回传查询反馈。 |
 | 内容审核 | 使用 wiki-review 审核这些页面的关键主张、解释深度和关联，给出依据及修改建议。 |
 | Wiki 检查 | 使用 wiki-lint 检查当前 Wiki：raw 做基础检查，Wiki 按已确认的六类要求核对。 |
 | 仅机械检查 | 使用 wiki-lint 只检查文件、链接、锚点和导航。 |
 
-只要求查询或审核时，Agent 交付结果与建议；要求保存或修复时，按明确范围完成改动和复查。
+查询交付结果与建议，并向 `query-feedback/` 新增独立日志；不读取 raw，不修改知识、导航、SELF、规范或 Skill。需要保存新知识时另行使用 ingest，审核与修复按对应明确范围处理。
+
+### 在其他项目中使用 Wiki
+
+初始化会将查询 Skill 定制为 `query-quant-wiki` 这样的名称：Wiki 内保存本体，确认的共享 Skill 目录保存同名、同内容的镜像。Skill 绑定 Wiki 的绝对位置，外部项目沿 SELF、INDEX、定向搜索及知识页链接查询，无需把项目放进 Wiki 仓库。安装位置根据模型运行环境确定；Codex 的用户级共享目录见[官方 Skill 文档](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)。模板本身保留通用 `wiki-query`，不为尚未初始化的主题安装镜像。
+
+例如，在使用方项目中请求：
+
+```text
+使用 query-quant-wiki 查找与当前问题有关的知识，读取正文后说明依据和适用条件。
+只查询 wiki/，不读取 raw；向 query-feedback/ 新增本次反馈，不修改其他 Wiki 文件。
+```
+
+反馈记录查询时间与 Wiki 标识、问题摘要、检索词、实际读取的页面和章节、查询结果、限制及具体建议。每次使用唯一文件名，不追加或覆盖已有日志；无法回传时输出日志并说明未写入。Wiki 维护端之后审核反馈，日志本身不授权修订内容。
+
+初始化后，介绍、规范及查询 Skill 的本体与镜像保持固定。知识与导航更新不触发 Skill 修改或重装，query 每次读取当前入口。外部环境无法访问绑定位置时报告具体限制；同名安装内容不一致时保留已有文件并报告冲突，不自动覆盖。
 
 lint 中的结构工具依赖 Python 3.9+ 标准库，可从项目根目录直接运行：
 
