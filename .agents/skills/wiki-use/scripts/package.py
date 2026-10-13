@@ -383,10 +383,10 @@ def copy_payload(source, destination, manifest):
         raise PackageError("source_changed", "Source release changed while preparing a complete copy")
 
 
-def install(root, project=None, source=None, allow_update=False, skills_dir=None):
+def install(root, project=None, source=None, allow_update=False, skills_dir=None, *, _source_manifest=None, _local_manifest=None):
     if source is None:
         source = absolute(load_manifest(root)["bindings"]["source_package"], "source_package")
-    release = verified(source)
+    release = _source_manifest if _source_manifest is not None else verified(source)
     if Path(release["bindings"]["source_package"]) != source:
         raise PackageError("different_source", "Requested source is not the bound authoritative source_package")
     if (project is None) == (skills_dir is None):
@@ -413,7 +413,9 @@ def install(root, project=None, source=None, allow_update=False, skills_dir=None
         state = "installed"
         before = None
         if target.exists():
-            local = inspect(target)
+            local = ({"state": "valid", "manifest": _local_manifest,
+                      "manifest_sha256": manifest_digest(target)}
+                     if _local_manifest is not None else inspect(target))
             if local["state"] != "valid":
                 raise PackageError("customized", "Existing target is not a pristine complete release; preserve it", details=local)
             installed = local["manifest"]
@@ -452,7 +454,7 @@ def install(root, project=None, source=None, allow_update=False, skills_dir=None
         stage = Path(tempfile.mkdtemp(prefix=f".{name}-stage-", dir=target.parent))
         copy_payload(source, stage, release)
         write_json(stage / INSTALLATION, identity_record(stage, release, **location))
-        valid_for_use(stage, check_project=False)
+        assert_record(stage, release, record(stage))
         if before is not None:
             try:
                 now = valid_for_use(target)
@@ -500,8 +502,8 @@ def install(root, project=None, source=None, allow_update=False, skills_dir=None
         lock.unlink(missing_ok=True)
 
 
-def snapshot(root, output):
-    manifest = valid_for_use(root)
+def snapshot(root, output, *, _manifest=None):
+    manifest = _manifest if _manifest is not None else valid_for_use(root)
     if is_within(output, root) or is_within(root, output):
         raise PackageError("invalid_target", "Task snapshot and package directories must not overlap")
     if output.exists() or output.is_symlink():
@@ -512,7 +514,7 @@ def snapshot(root, output):
     try:
         copy_payload(root, stage, manifest)
         write_json(stage / SNAPSHOT, identity_record(stage, manifest, original_package=str(root)))
-        valid_for_use(stage)
+        assert_record(stage, manifest, record(stage, SNAPSHOT), SNAPSHOT)
         if output.exists() or output.is_symlink():
             raise PackageError("snapshot_exists", "Task snapshot appeared during preparation; preserve it")
         # mkdir reserves the exact output without replacing any existing path.
@@ -533,6 +535,74 @@ def snapshot(root, output):
     finally:
         if stage is not None:
             shutil.rmtree(stage, ignore_errors=True)
+
+
+def prepare(root, output, allow_update=False):
+    """Verify one task version, update when authorized, and freeze its full package."""
+    try:
+        manifest = valid_for_use(root)
+    except PackageError as exc:
+        if (root / INSTALLATION).exists() and exc.state != "installation_mismatch":
+            raise PackageError("customized", "Installed package is not intact; preserve local contents", cause=exc.state) from exc
+        raise
+    if record(root, SNAPSHOT) is not None:
+        return {"state": "ready", "snapshot": str(root), "version": manifest["version"],
+                "content_sha256": manifest["content_sha256"], "freshness": "fixed_snapshot",
+                "source_checked": False, "updated": False, "limitations": []}
+
+    source = absolute(manifest["bindings"]["source_package"], "source_package")
+    freshness, source_checked, updated, limitations = "current", True, False, []
+    previous_installation = None
+    if source != root:
+        installation = record(root)
+        if installation is None:
+            raise PackageError("unrecorded", "Mirror has no installation provenance; install it before preparing a task")
+        release = inspect(source)
+        if release["state"] != "valid":
+            if release["state"] not in {"unavailable", "unpublished", "source_modified"}:
+                raise PackageError(release["state"], "Source cannot be trusted for task preparation; preserve the installed package", source_details=release)
+            unavailable = release["state"] == "unavailable"
+            freshness = "source_unavailable" if unavailable else "source_unpublished"
+            source_checked = not unavailable
+            limitations.append("Source is unavailable; latest version was not confirmed." if unavailable else
+                               "Source has no valid published release; used the intact installed version.")
+        else:
+            latest = release["manifest"]
+            if origin(manifest) != origin(latest):
+                raise PackageError("different_source", "Published source identity differs from this installed package")
+            if latest["version"] < manifest["version"]:
+                raise PackageError("ahead", "Installed version is ahead of the published source; refuse automatic replacement")
+            if latest["version"] == manifest["version"]:
+                if manifest_digest(root) != release["manifest_sha256"]:
+                    raise PackageError("release_conflict", "Same-version source and mirror have different release identities")
+            elif not allow_update:
+                freshness = "outdated"
+                limitations.append("A newer release exists; update was not authorized, so this task uses the intact installed version.")
+            else:
+                scope = installation["scope"]
+                result = install(root, root.parent.parent.parent if scope == "project" else None,
+                                 source, True, root.parent if scope == "shared" else None,
+                                 _source_manifest=latest, _local_manifest=manifest)
+                previous_installation = result.get("previous_installation")
+                manifest, updated = latest, True
+
+    try:
+        frozen = snapshot(root, output, _manifest=manifest)
+    except (PackageError, OSError) as exc:
+        if not updated:
+            raise
+        details = {"updated": True, "version": manifest["version"], "installation": str(root),
+                   "previous_installation": previous_installation}
+        if isinstance(exc, PackageError):
+            exc.details.update(details)
+            raise
+        raise PackageError("snapshot_failed", str(exc), **details) from exc
+    result = {"state": "ready", "snapshot": frozen["snapshot"], "version": manifest["version"],
+              "content_sha256": manifest["content_sha256"], "freshness": freshness,
+              "source_checked": source_checked, "updated": updated, "limitations": limitations}
+    if previous_installation is not None:
+        result["previous_installation"] = previous_installation
+    return result
 
 
 def feedback(root, input_path):
@@ -602,6 +672,9 @@ def main(argv=None):
     install_cmd.add_argument("--allow-update", action="store_true")
     freeze = commands.add_parser("snapshot")
     freeze.add_argument("--output", required=True)
+    ready = commands.add_parser("prepare")
+    ready.add_argument("--output", required=True)
+    ready.add_argument("--allow-update", action="store_true")
     report = commands.add_parser("feedback")
     report.add_argument("--input", required=True)
     args = parser.parse_args(argv)
@@ -621,6 +694,8 @@ def main(argv=None):
                              destination(args.skills_dir, "skills_dir") if args.skills_dir else None)
         elif args.operation == "snapshot":
             result = snapshot(root, destination(args.output, "output"))
+        elif args.operation == "prepare":
+            result = prepare(root, destination(args.output, "output"), args.allow_update)
         else:
             result = feedback(root, absolute(args.input, "input"))
         print(json.dumps({"ok": True, "operation": args.operation, **result}, ensure_ascii=False, sort_keys=True))

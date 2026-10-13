@@ -431,6 +431,174 @@ class PackageLifecycleTests(unittest.TestCase):
         record_path.write_text(json.dumps(value))
         self.assertEqual(self.call("verify", package=self.installation, expected=2)["state"], "customized")
 
+    def test_prepare_source_creates_one_verified_complete_snapshot(self):
+        output = self.base / "tasks/source/package"
+        real_scan = self.module.payload_files
+        scans = []
+        def track_scan(path):
+            scans.append(path)
+            return real_scan(path)
+        with mock.patch.object(self.module, "payload_files", side_effect=track_scan):
+            result = self.module.prepare(self.source, output)
+        self.assertEqual(result["state"], "ready")
+        self.assertEqual(result["snapshot"], str(output))
+        self.assertEqual(result["freshness"], "current")
+        self.assertTrue(result["source_checked"])
+        self.assertFalse(result["updated"])
+        self.assertEqual(result["limitations"], [])
+        self.assertEqual(scans.count(self.source), 1)
+        self.assertEqual(scans.count(output), 1)
+        self.assertEqual(len(scans), 3)
+        self.assertTrue((output / "skills/wiki-query/SKILL.md").is_file())
+        self.assertFalse((self.source / ".installation.json").exists())
+        self.assertFalse(self.project.exists())
+
+    def test_prepare_uses_old_release_without_update_permission_then_keeps_backup(self):
+        self.install()
+        before = {p.relative_to(self.installation): p.read_bytes()
+                  for p in self.installation.rglob("*") if p.is_file()}
+        (self.source / "SKILL.md").write_text("Source version two\n")
+        self.publish(2)
+        old_task = self.base / "tasks/old/package"
+        initial = self.call("prepare", "--output", str(old_task), package=self.installation, default_tool=True)
+        self.assertEqual(initial["state"], "ready")
+        self.assertEqual(initial["version"], 1)
+        self.assertEqual(initial["freshness"], "outdated")
+        self.assertFalse(initial["updated"])
+        self.assertTrue(initial["limitations"])
+        self.assertEqual(before, {p.relative_to(self.installation): p.read_bytes()
+                                 for p in self.installation.rglob("*") if p.is_file()})
+        new_task = self.base / "tasks/new/package"
+        result = self.call("prepare", "--output", str(new_task), "--allow-update", package=self.installation, default_tool=True)
+        self.assertEqual(result["version"], 2)
+        self.assertEqual(result["freshness"], "current")
+        self.assertTrue(result["updated"])
+        self.assertEqual(result["limitations"], [])
+        backup = Path(result["previous_installation"])
+        self.assertTrue(backup.is_dir())
+        self.assertEqual(before, {p.relative_to(backup): p.read_bytes()
+                                 for p in backup.rglob("*") if p.is_file()})
+        self.assertEqual(json.loads((old_task / "package.json").read_text())["version"], 1)
+        self.assertEqual(initial["content_sha256"], json.loads((old_task / "package.json").read_text())["content_sha256"])
+
+    def test_prepare_intact_mirror_with_unavailable_or_draft_source(self):
+        self.install()
+        (self.source / "SKILL.md").write_text("Unpublished work\n")
+        draft = self.call("prepare", "--output", str(self.base / "draft/package"), package=self.installation)
+        self.assertEqual(draft["freshness"], "source_unpublished")
+        self.assertTrue(draft["source_checked"])
+        self.assertFalse(draft["updated"])
+        self.assertTrue(draft["limitations"])
+        self.source.rename(self.base / "offline-source")
+        offline = self.call("prepare", "--output", str(self.base / "offline/package"), package=self.installation)
+        self.assertEqual(offline["state"], "ready")
+        self.assertEqual(offline["freshness"], "source_unavailable")
+        self.assertFalse(offline["source_checked"])
+        self.assertEqual(offline["version"], 1)
+        self.assertTrue(offline["limitations"])
+
+    def test_prepare_fixed_snapshot_reuses_it_without_source_access(self):
+        output = self.base / "fixed/package"
+        self.call("prepare", "--output", str(output))
+        unused = self.base / "must-not-create/package"
+        before = {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+        with mock.patch.object(self.module, "inspect", side_effect=AssertionError("Fixed task must not inspect source")):
+            result = self.module.prepare(output, unused, allow_update=True)
+        self.assertEqual(result["snapshot"], str(output))
+        self.assertEqual(result["freshness"], "fixed_snapshot")
+        self.assertFalse(result["source_checked"])
+        self.assertFalse(unused.exists())
+        self.assertEqual(before, {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()})
+
+    def test_prepare_refuses_customization_source_conflict_and_downgrade(self):
+        self.install()
+        entry = self.installation / "SKILL.md"
+        original = entry.read_bytes()
+        entry.write_text("Local task method\n")
+        output = self.base / "refused/package"
+        refusal = self.call("prepare", "--output", str(output), "--allow-update", package=self.installation, expected=2)
+        self.assertEqual(refusal["state"], "customized")
+        self.assertFalse(output.exists())
+        self.assertEqual(entry.read_text(), "Local task method\n")
+        entry.write_bytes(original)
+        manifest_path = self.source / "package.json"
+        original_manifest = manifest_path.read_bytes()
+        other_origin = json.loads(original_manifest)
+        other_origin["bindings"]["wiki_root"] = str(self.base / "other-wiki")
+        other_origin["bindings"]["feedback_root"] = str(self.base / "other-wiki/query-feedback")
+        other_origin["content_sha256"] = self.module.sha256(self.module.canonical({key: value for key, value in other_origin.items() if key != "content_sha256"}))
+        manifest_path.write_text(json.dumps(other_origin))
+        self.assertEqual(self.call("prepare", "--output", str(output), "--allow-update", package=self.installation, expected=2)["state"], "different_source")
+        manifest_path.write_bytes(original_manifest)
+        (self.source / "SKILL.md").write_text("Same-version conflicting publication\n")
+        current = json.loads(original_manifest)
+        current["files"] = self.module.payload_files(self.source)
+        current["content_sha256"] = self.module.sha256(self.module.canonical({key: value for key, value in current.items() if key != "content_sha256"}))
+        manifest_path.write_text(json.dumps(current))
+        self.assertEqual(self.call("prepare", "--output", str(output), "--allow-update", package=self.installation, expected=2)["state"], "release_conflict")
+        (self.source / "SKILL.md").write_bytes(original)
+        manifest_path.write_bytes(original_manifest)
+        self.publish(2)
+        self.call("install", "--project", str(self.project), "--allow-update")
+        manifest_path.write_bytes(original_manifest)
+        self.assertEqual(self.call("prepare", "--output", str(output), "--allow-update", package=self.installation, expected=2)["state"], "ahead")
+        self.assertFalse(output.exists())
+        self.assertEqual(json.loads((self.installation / "package.json").read_text())["version"], 2)
+
+    def test_prepare_rejects_invalid_or_unsafe_source_without_using_it(self):
+        self.install()
+        manifest_path = self.source / "package.json"
+        original = manifest_path.read_bytes()
+        manifest_path.write_text("{broken")
+        output = self.base / "untrusted/package"
+        before = (self.installation / ".installation.json").read_bytes()
+        self.assertEqual(self.call("prepare", "--output", str(output), "--allow-update", package=self.installation, expected=2)["state"], "invalid_manifest")
+        self.assertFalse(output.exists())
+        self.assertEqual((self.installation / ".installation.json").read_bytes(), before)
+        manifest_path.write_bytes(original)
+        target = self.base / "unrelated"
+        target.write_text("Must not be loaded\n")
+        (self.source / "unsafe-link").symlink_to(target)
+        self.assertEqual(self.call("prepare", "--output", str(output), package=self.installation, expected=2)["state"], "unsafe_payload")
+        self.assertFalse(output.exists())
+        self.assertEqual(target.read_text(), "Must not be loaded\n")
+
+    def test_prepare_shared_update_checks_source_once_and_keeps_final_verification(self):
+        shared = self.base / "shared"
+        self.call("install", "--skills-dir", str(shared))
+        installed = shared / self.package_name
+        (self.source / "SKILL.md").write_text("New shared release\n")
+        self.publish(2)
+        real_scan = self.module.payload_files
+        scans = []
+        def track_scan(path):
+            scans.append(path)
+            return real_scan(path)
+        output = self.base / "shared-task/package"
+        with mock.patch.object(self.module, "payload_files", side_effect=track_scan):
+            result = self.module.prepare(installed, output, allow_update=True)
+        self.assertTrue(result["updated"])
+        self.assertEqual(result["version"], 2)
+        self.assertTrue(Path(result["previous_installation"]).is_dir())
+        self.assertEqual(scans.count(self.source), 1)
+        self.assertEqual(scans.count(installed), 3)
+        self.assertEqual(scans.count(output), 1)
+        self.assertEqual(json.loads((installed / ".installation.json").read_text())["scope"], "shared")
+
+    def test_prepare_reports_retained_backup_when_snapshot_fails_after_update(self):
+        self.install()
+        (self.source / "SKILL.md").write_text("Source version two\n")
+        self.publish(2)
+        occupied = self.base / "existing-snapshot"
+        occupied.mkdir()
+        (occupied / "user-file").write_text("Keep this result\n")
+        result = self.call("prepare", "--output", str(occupied), "--allow-update", package=self.installation, expected=2)
+        self.assertEqual(result["state"], "snapshot_exists")
+        self.assertTrue(result["updated"])
+        self.assertEqual(result["version"], 2)
+        self.assertTrue(Path(result["previous_installation"]).is_dir())
+        self.assertEqual((occupied / "user-file").read_text(), "Keep this result\n")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
